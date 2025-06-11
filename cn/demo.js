@@ -423,9 +423,6 @@ function getDevicePort() {
 
     var oPort = WebVideoCtrl.I_GetDevicePort(szDeviceIdentify);
     if (oPort != null) {
-        $("#deviceport").val(oPort.iDevicePort);
-        $("#rtspport").val(oPort.iRtspPort);
-
         showOPInfo(szDeviceIdentify + " 获取端口成功！");
     } else {
         showOPInfo(szDeviceIdentify + " 获取端口失败！");
@@ -436,17 +433,18 @@ function getDevicePort() {
 // 开始预览
 function clickStartRealPlay(iStreamType) {
     var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szDeviceIdentify = $("#ip").val(),
-        iRtspPort = parseInt($("#rtspport").val(), 10),
-        iChannelID = parseInt($("#channels").val(), 10),
+        szDeviceIdentify = g_szCurrentDevice,
+        iRtspPort = 554, // 使用默认RTSP端口
+        iChannelID = parseInt($("#channels").val(), 10) || 1, // 如果获取失败，使用默认通道1
         bZeroChannel = $("#channels option").eq($("#channels").get(0).selectedIndex).attr("bZero") == "true" ? true : false,
         szInfo = "";
 
     if ("undefined" === typeof iStreamType) {
-        iStreamType = parseInt($("#streamtype").val(), 10);
+        iStreamType = 1; // 使用默认流类型：主码流
     }
 
-    if (null == szDeviceIdentify) {
+    if (null == szDeviceIdentify || "" == szDeviceIdentify) {
+        console.log("设备未登录，无法开始预览！");
         return;
     }
     var startRealPlay = function () {
