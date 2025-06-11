@@ -35,8 +35,6 @@ $(function () {
                 showCBInfo("窗口" + iParam1 + "回放结束！");
             } else if (-1 == iEventType) {
                 showCBInfo("设备" + iParam1 + "网络错误！");
-            } else if (3001 == iEventType) {
-                clickStopRecord(g_szRecordType, iParam1);
             }
         },
         cbRemoteConfig: function () {
@@ -62,20 +60,9 @@ $(function () {
 
     //初始化日期时间
     var szCurTime = dateFormat(new Date(), "yyyy-MM-dd");
-    $("#starttime").val(szCurTime + " 00:00:00");
-    $("#endtime").val(szCurTime + " 23:59:59");
-    $("#downloadstarttime").val(szCurTime + " 00:00:00");
-    $("#downloadendtime").val(szCurTime + " 23:59:59");
     if(WebVideoCtrl.I_SupportNoPlugin()){
        $(".localconfig").hide();
        $(".ipparse").hide();
-       $("#checkVersion").hide();
-       $("#remoteconfig").hide();
-       $("#btnReverse").hide();
-       $("#btnReverse").show();
-    }
-    else{
-       // $("#fullbtn").hide();
     }
 });
 
