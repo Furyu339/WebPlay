@@ -3,6 +3,16 @@
 // 全局保存当前选中窗口
 var g_iWndIndex = 0; //可以不用设置这个变量，有窗口参数的接口中，不用传值，开发包会默认使用当前选择窗口
 var version="websdk3.220191023"
+
+// 登录信息
+var DEFAULT_LOGIN_CONFIG = {
+    ip: "172.17.100.37",
+    port: "80",
+    username: "admin",
+    password: "zhtc12345"
+};
+
+
 $(function () {
     // 检查插件是否已经安装过
     var iRet = window.WebVideoCtrl.I_CheckPluginInstall();
@@ -64,6 +74,11 @@ $(function () {
        $(".localconfig").hide();
        $(".ipparse").hide();
     }
+    
+    // 页面加载完成后自动登录
+    setTimeout(function() {
+        clickLogin();
+    }, 1000); // 延迟1秒确保插件初始化完成
 });
 
 // 显示操作信息
@@ -195,10 +210,11 @@ function changeWndNum(iType) {
 
 // 登录
 function clickLogin() {
-    var szIP = $("#loginip").val(),
-        szPort = $("#port").val(),
-        szUsername = $("#username").val(),
-        szPassword = $("#password").val();
+    // 使用登录配置
+    var szIP = '172.17.100.37',
+        szPort = "80",
+        szUsername = "admin",
+        szPassword = "zhtc12345";
 
     if ("" == szIP || "" == szPort) {
         return;
@@ -208,21 +224,26 @@ function clickLogin() {
 
     var iRet = WebVideoCtrl.I_Login(szIP, 1, szPort, szUsername, szPassword, {
         success: function (xmlDoc) {            
-            showOPInfo(szDeviceIdentify + " 登录成功！");
-            $("#ip").prepend("<option value='" + szDeviceIdentify + "'>" + szDeviceIdentify + "</option>");
+            // 登录成功
             setTimeout(function () {
-                $("#ip").val(szDeviceIdentify);
                 getChannelInfo();
                 getDevicePort();
             }, 10);
         },
         error: function (status, xmlDoc) {
-            showOPInfo(szDeviceIdentify + " 登录失败！", status, xmlDoc);
+            // 登录失败，重试
+            setTimeout(function() {
+                clickLogin();
+            }, 3000);
         }
     });
 
     if (-1 == iRet) {
-        showOPInfo(szDeviceIdentify + " 已登录过！");
+        // 设备已登录
+        setTimeout(function () {
+            getChannelInfo();
+            getDevicePort();
+        }, 10);
     }
 }
 
@@ -372,68 +393,7 @@ function getDevicePort() {
     }
 }
 
-// 获取数字通道
-function clickGetDigitalChannelInfo() {
-    var szDeviceIdentify = $("#ip").val(),
-        iAnalogChannelNum = 0;
 
-    $("#digitalchannellist").empty();
-
-    if (null == szDeviceIdentify) {
-        return;
-    }
-
-    // 模拟通道
-    WebVideoCtrl.I_GetAnalogChannelInfo(szDeviceIdentify, {
-        async: false,
-        success: function (xmlDoc) {
-            iAnalogChannelNum = $(xmlDoc).find("VideoInputChannel").length;
-        },
-        error: function () {
-            
-        }
-    });
-
-    // 数字通道
-    WebVideoCtrl.I_GetDigitalChannelInfo(szDeviceIdentify, {
-        async: false,
-        success: function (xmlDoc) {
-            var oChannels = $(xmlDoc).find("InputProxyChannelStatus");
-            
-            $.each(oChannels, function () {
-                var id = parseInt($(this).find("id").eq(0).text(), 10),
-                    ipAddress = $(this).find("ipAddress").eq(0).text(),
-                    srcInputPort = $(this).find("srcInputPort").eq(0).text(),
-                    managePortNo = $(this).find("managePortNo").eq(0).text(),
-                    online = $(this).find("online").eq(0).text(),
-                    proxyProtocol = $(this).find("proxyProtocol").eq(0).text();
-                            
-                var objTr = $("#digitalchannellist").get(0).insertRow(-1);
-                var objTd = objTr.insertCell(0);
-                objTd.innerHTML = (id - iAnalogChannelNum) < 10 ? "D0" + (id - iAnalogChannelNum) : "D" + (id - iAnalogChannelNum);
-                objTd = objTr.insertCell(1);
-                objTd.width = "25%";
-                objTd.innerHTML = ipAddress;
-                objTd = objTr.insertCell(2);
-                objTd.width = "15%";
-                objTd.innerHTML = srcInputPort;
-                objTd = objTr.insertCell(3);
-                objTd.width = "20%";
-                objTd.innerHTML = managePortNo;
-                objTd = objTr.insertCell(4);
-                objTd.width = "15%";
-                objTd.innerHTML = "true" == online ? "在线" : "离线";
-                objTd = objTr.insertCell(5);
-                objTd.width = "25%";
-                objTd.innerHTML = proxyProtocol;
-            });
-            showOPInfo(szDeviceIdentify + " 获取数字通道成功！");
-        },
-        error: function (status, xmlDoc) {
-            showOPInfo(szDeviceIdentify + " 没有数字通道！", status, xmlDoc);
-        }
-    });
-}
 // 开始预览
 function clickStartRealPlay(iStreamType) {
     var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
@@ -562,278 +522,14 @@ function clickOpenSound() {
     }
 }
 
-// 关闭声音
-function clickCloseSound() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szInfo = "";
 
-    if (oWndInfo != null) {
-        var iRet = WebVideoCtrl.I_CloseSound();
-        if (0 == iRet) {
-            szInfo = "关闭声音成功！";
-        } else {
-            szInfo = "关闭声音失败！";
-        }
-        showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-    }
-}
 
-// 设置音量
-function clickSetVolume() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        iVolume = parseInt($("#volume").val(), 10),
-        szInfo = "";
 
-    if (oWndInfo != null) {
-        var iRet = WebVideoCtrl.I_SetVolume(iVolume);
-        if (0 == iRet) {
-            szInfo = "音量设置成功！";
-        } else {
-            szInfo = "音量设置失败！";
-        }
-        showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-    }
-}
 
-// 抓图
-function clickCapturePic() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szInfo = "";
 
-    if (oWndInfo != null) {
-        var xmlDoc = WebVideoCtrl.I_GetLocalCfg();
-        var szCaptureFileFormat = "0";
-        if (xmlDoc != null) {
-            szCaptureFileFormat = $(xmlDoc).find("CaptureFileFormat").eq(0).text();
-        }
 
-        var szChannelID = $("#channels").val();
-        var szPicName = oWndInfo.szDeviceIdentify + "_" + szChannelID + "_" + new Date().getTime();
-        
-        szPicName += ("0" === szCaptureFileFormat) ? ".jpg": ".bmp";
 
-        WebVideoCtrl.I2_CapturePic(szPicName, {
-            bDateDir: true  //是否生成日期文件
-        }).then(function(){
-            szInfo = "抓图成功！";
-            showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-        },function(){
-            szInfo = "抓图失败！";
-            showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-        });
-    }
-}
-// 抓图
-function clickCapturePicData() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szInfo = "";
-    if (oWndInfo != null) {
-        WebVideoCtrl.I2_CapturePicData().then(function(data){
-            szInfo = "抓图上传成功！";
-            console.log(data);
-            showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-        },function(){
-            szInfo = "抓图失败！";
-            showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-        });
-    }
-}
 
-// 开始录像
-var g_szRecordType = "";
-function clickStartRecord(szType) {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szInfo = "";
-
-    g_szRecordType = szType;
-
-    if (oWndInfo != null) {
-        var szChannelID = $("#channels").val(),
-            szFileName = oWndInfo.szDeviceIdentify + "_" + szChannelID + "_" + new Date().getTime();
-
-        WebVideoCtrl.I_StartRecord(szFileName, {
-            bDateDir: true, //是否生成日期文件
-            success: function () {
-                if ('realplay' === szType) {
-                    szInfo = "开始录像成功！";
-                } else if ('playback' === szType) {
-                    szInfo = "开始剪辑成功！";
-                }
-                showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-            },
-            error: function () {
-                if ('realplay' === szType) {
-                    szInfo = "开始录像失败！";
-                } else if ('playback' === szType) {
-                    szInfo = "开始剪辑失败！";
-                }
-                showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-            }
-        });
-    }
-}
-
-// 停止录像
-function clickStopRecord(szType, iWndIndex) {
-    if ("undefined" === typeof iWndIndex) {
-        iWndIndex = g_iWndIndex;
-    }
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(iWndIndex),
-        szInfo = "";
-
-    if (oWndInfo != null) {
-        WebVideoCtrl.I_StopRecord({
-            success: function () {
-                if ('realplay' === szType) {
-                    szInfo = "停止录像成功！";
-                } else if ('playback' === szType) {
-                    szInfo = "停止剪辑成功！";
-                }
-                showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-            },
-            error: function () {
-                if ('realplay' === szType) {
-                    szInfo = "停止录像失败！";
-                } else if ('playback' === szType) {
-                    szInfo = "停止剪辑失败！";
-                }
-                showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-            }
-        });
-    }
-}
-
-// 获取对讲通道
-function clickGetAudioInfo() {
-    var szDeviceIdentify = $("#ip").val();
-
-    if (null == szDeviceIdentify) {
-        return;
-    }
-
-    WebVideoCtrl.I_GetAudioInfo(szDeviceIdentify, {
-        success: function (xmlDoc) {
-            var oAudioChannels = $(xmlDoc).find("TwoWayAudioChannel"),
-                oSel = $("#audiochannels").empty();
-            $.each(oAudioChannels, function () {
-                var id = $(this).find("id").eq(0).text();
-
-                oSel.append("<option value='" + id + "'>" + id + "</option>");
-            });
-            showOPInfo(szDeviceIdentify + " 获取对讲通道成功！");
-        },
-        error: function (status, xmlDoc) {
-            showOPInfo(szDeviceIdentify + " 获取对讲通道失败！", status, xmlDoc);
-        }
-    });
-}
-
-// 开始对讲
-function clickStartVoiceTalk() {
-    var szDeviceIdentify = $("#ip").val(),
-        iAudioChannel = parseInt($("#audiochannels").val(), 10),
-        szInfo = "";
-
-    if (null == szDeviceIdentify) {
-        return;
-    }
-
-    if (isNaN(iAudioChannel)) {
-        alert("请选择对讲通道！");
-        return;
-    }
-
-    var iRet = WebVideoCtrl.I_StartVoiceTalk(szDeviceIdentify, iAudioChannel);
-
-    if (0 == iRet) {
-        szInfo = "开始对讲成功！";
-    } else {
-        szInfo = "开始对讲失败！";
-    }
-    showOPInfo(szDeviceIdentify + " " + szInfo);
-}
-
-// 停止对讲
-function clickStopVoiceTalk() {
-    var szDeviceIdentify = $("#ip").val(),
-        iRet = WebVideoCtrl.I_StopVoiceTalk(),
-        szInfo = "";
-
-    if (null == szDeviceIdentify) {
-        return;
-    }
-
-    if (0 == iRet) {
-        szInfo = "停止对讲成功！";
-    } else {
-        szInfo = "停止对讲失败！";
-    }
-    showOPInfo(szDeviceIdentify + " " + szInfo);
-}
-
-// 启用电子放大
-function clickEnableEZoom() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szInfo = "";
-
-    if (oWndInfo != null) {
-        var iRet = WebVideoCtrl.I_EnableEZoom();
-        if (0 == iRet) {
-            szInfo = "启用电子放大成功！";
-        } else {
-            szInfo = "启用电子放大失败！";
-        }
-        showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-    }
-}
-
-// 禁用电子放大
-function clickDisableEZoom() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szInfo = "";
-
-    if (oWndInfo != null) {
-        var iRet = WebVideoCtrl.I_DisableEZoom();
-        if (0 == iRet) {
-            szInfo = "禁用电子放大成功！";
-        } else {
-            szInfo = "禁用电子放大失败！";
-        }
-        showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-    }
-}
-
-// 启用3D放大
-function clickEnable3DZoom() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szInfo = "";
-
-    if (oWndInfo != null) {
-        var iRet = WebVideoCtrl.I_Enable3DZoom();
-        if (0 == iRet) {
-            szInfo = "启用3D放大成功！";
-        } else {
-            szInfo = "启用3D放大失败！";
-        }
-        showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-    }
-}
-
-// 禁用3D放大
-function clickDisable3DZoom() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szInfo = "";
-
-    if (oWndInfo != null) {
-        var iRet = WebVideoCtrl.I_Disable3DZoom();
-        if (0 == iRet) {
-            szInfo = "禁用3D放大成功！";
-        } else {
-            szInfo = "禁用3D放大失败！";
-        }
-        showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-    }
-}
 
 // 全屏
 function clickFullScreen() {
@@ -893,39 +589,6 @@ function mouseUpPTZControl() {
     }
 }
 
-// 设置预置点
-function clickSetPreset() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        iPresetID = parseInt($("#preset").val(), 10);
-
-    if (oWndInfo != null) {
-        WebVideoCtrl.I_SetPreset(iPresetID, {
-            success: function (xmlDoc) {
-                showOPInfo(oWndInfo.szDeviceIdentify + " 设置预置点成功！");
-            },
-            error: function (status, xmlDoc) {
-                showOPInfo(oWndInfo.szDeviceIdentify + " 设置预置点失败！", status, xmlDoc);
-            }
-        });
-    }
-}
-
-// 调用预置点
-function clickGoPreset() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        iPresetID = parseInt($("#preset").val(), 10);
-
-    if (oWndInfo != null) {
-        WebVideoCtrl.I_GoPreset(iPresetID, {
-            success: function (xmlDoc) {
-                showOPInfo(oWndInfo.szDeviceIdentify + " 调用预置点成功！");
-            },
-            error: function (status, xmlDoc) {
-                showOPInfo(oWndInfo.szDeviceIdentify + " 调用预置点失败！", status, xmlDoc);
-            }
-        });
-    }
-}
 
 // 搜索录像
 var g_iSearchTimes = 0;
@@ -1033,174 +696,6 @@ function clickRecordSearch(iType) {
     });
 }
 
-// 开始回放
-function clickStartPlayback() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szDeviceIdentify = $("#ip").val(),
-        iRtspPort = parseInt($("#rtspport").val(), 10),
-        iStreamType = parseInt($("#record_streamtype").val(), 10),
-        bZeroChannel = $("#channels option").eq($("#channels").get(0).selectedIndex).attr("bZero") == "true" ? true : false,
-        iChannelID = parseInt($("#channels").val(), 10),
-        szStartTime = $("#starttime").val(),
-        szEndTime = $("#endtime").val(),
-        szInfo = "",
-        bChecked = $("#transstream").prop("checked"),
-        iRet = -1;
-
-    if (null == szDeviceIdentify) {
-        return;
-    }
-
-    if (bZeroChannel) {// 零通道不支持回放
-        return;
-    }
-
-    var startPlayback = function () {
-        if (bChecked) {// 启用转码回放
-            var oTransCodeParam = {
-                TransFrameRate: "14",// 0：全帧率，5：1，6：2，7：4，8：6，9：8，10：10，11：12，12：16，14：15，15：18，13：20，16：22
-                TransResolution: "1",// 255：Auto，3：4CIF，2：QCIF，1：CIF
-                TransBitrate: "19"// 2：32K，3：48K，4：64K，5：80K，6：96K，7：128K，8：160K，9：192K，10：224K，11：256K，12：320K，13：384K，14：448K，15：512K，16：640K，17：768K，18：896K，19：1024K，20：1280K，21：1536K，22：1792K，23：2048K，24：3072K，25：4096K，26：8192K
-            };
-            WebVideoCtrl.I_StartPlayback(szDeviceIdentify, {
-                iRtspPort: iRtspPort,
-                iStreamType: iStreamType,
-                iChannelID: iChannelID,
-                szStartTime: szStartTime,
-                szEndTime: szEndTime,
-                oTransCodeParam: oTransCodeParam,
-                success: function () {
-                    szInfo = "开始回放成功！";
-                    showOPInfo(szDeviceIdentify + " " + szInfo);
-                },
-                error: function (status, xmlDoc) {
-                    if (403 === status) {
-                        szInfo = "设备不支持Websocket取流！";
-                    } else {
-                        szInfo = "开始回放失败！";
-                    }
-                    showOPInfo(szDeviceIdentify + " " + szInfo);
-                }
-            });
-        } else {
-            WebVideoCtrl.I_StartPlayback(szDeviceIdentify, {
-                iRtspPort: iRtspPort,
-                iStreamType: iStreamType,
-                iChannelID: iChannelID,
-                szStartTime: szStartTime,
-                szEndTime: szEndTime,
-                success: function () {
-                    szInfo = "开始回放成功！";
-                    showOPInfo(szDeviceIdentify + " " + szInfo);
-                },
-                error: function (status, xmlDoc) {
-                    if (403 === status) {
-                        szInfo = "设备不支持Websocket取流！";
-                    } else {
-                        szInfo = "开始回放失败！";
-                    }
-                    showOPInfo(szDeviceIdentify + " " + szInfo);
-                }
-            });
-        }
-    };
-
-    if (oWndInfo != null) {// 已经在播放了，先停止
-        WebVideoCtrl.I_Stop({
-            success: function () {
-                startPlayback();
-            }
-        });
-    } else {
-        startPlayback();
-    }
-}
-
-// 停止回放
-function clickStopPlayback() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szInfo = "";
-
-    if (oWndInfo != null) {
-        WebVideoCtrl.I_Stop({
-            success: function () {
-                szInfo = "停止回放成功！";
-                showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-            },
-            error: function () {
-                szInfo = "停止回放失败！";
-                showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-            }
-        });
-    }
-}
-
-// 开始倒放
-function clickReversePlayback() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szDeviceIdentify = $("#ip").val(),
-        iRtspPort = parseInt($("#rtspport").val(), 10),
-        iStreamType = parseInt($("#record_streamtype").val(), 10),
-        bZeroChannel = $("#channels option").eq($("#channels").get(0).selectedIndex).attr("bZero") == "true" ? true : false,
-        iChannelID = parseInt($("#channels").val(), 10),
-        szStartTime = $("#starttime").val(),
-        szEndTime = $("#endtime").val(),
-        szInfo = "";
-
-    if (null == szDeviceIdentify) {
-        return;
-    }
-
-    if (bZeroChannel) {// 零通道不支持倒放
-        return;
-    }
-
-    var reversePlayback = function () {
-        var iRet = WebVideoCtrl.I_ReversePlayback(szDeviceIdentify, {
-            iRtspPort: iRtspPort,
-            iStreamType: iStreamType,
-            iChannelID: iChannelID,
-            szStartTime: szStartTime,
-            szEndTime: szEndTime
-        });
-
-        if (0 == iRet) {
-            szInfo = "开始倒放成功！";
-        } else {
-            szInfo = "开始倒放失败！";
-        }
-        showOPInfo(szDeviceIdentify + " " + szInfo);
-    };
-
-    if (oWndInfo != null) {// 已经在播放了，先停止
-        WebVideoCtrl.I_Stop({
-            success: function () {
-                reversePlayback();
-            }
-        });
-    } else {
-        reversePlayback();
-    }
-}
-
-// 单帧
-function clickFrame() {
-    var oWndInfo = WebVideoCtrl.I_GetWindowStatus(g_iWndIndex),
-        szInfo = "";
-
-    if (oWndInfo != null) {
-        WebVideoCtrl.I_Frame({
-            success: function () {
-                szInfo = "单帧播放成功！";
-                showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-            },
-            error: function () {
-                szInfo = "单帧播放失败！";
-                showOPInfo(oWndInfo.szDeviceIdentify + " " + szInfo);
-            }
-        });
-    }
-}
 
 // 暂停
 function clickPause() {
@@ -1774,33 +1269,7 @@ function PTZIrisStop() {
     }
 }
 
-// 切换模式
-function changeIPMode(iType) {
-    var arrPort = [0, 7071, 80];
 
-    $("#serverport").val(arrPort[iType]);
-}
-
-// 获取设备IP
-function clickGetDeviceIP() {
-    var iDeviceMode = parseInt($("#devicemode").val(), 10),
-        szAddress = $("#serveraddress").val(),
-        iPort = parseInt($("#serverport").val(), 10) || 0,
-        szDeviceID = $("#deviceid").val(),
-        szDeviceInfo = "";
-
-    szDeviceInfo = WebVideoCtrl.I_GetIPInfoByMode(iDeviceMode, szAddress, iPort, szDeviceID);
-
-    if ("" == szDeviceInfo) {
-        showOPInfo("设备IP和端口解析失败！");
-    } else {
-        showOPInfo("设备IP和端口解析成功！");
-
-        var arrTemp = szDeviceInfo.split("-");
-        $("#loginip").val(arrTemp[0]);
-        $("#deviceport").val(arrTemp[1]);
-    }
-}
 
 // 启用多边形绘制
 var g_bEnableDraw = false;
