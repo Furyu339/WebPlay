@@ -4,6 +4,12 @@
 var g_iWndIndex = 0; //可以不用设置这个变量，有窗口参数的接口中，不用传值，开发包会默认使用当前选择窗口
 var version="websdk3.220191023"
 
+// 登录状态管理
+var g_bIsLoggedIn = false; // 登录状态标记
+var g_szCurrentDevice = ""; // 当前登录的设备标识
+var g_iLoginRetryCount = 0; // 登录重试次数
+var g_iMaxLoginRetries = 5; // 最大登录重试次数
+
 // 登录信息
 var DEFAULT_LOGIN_CONFIG = {
     ip: "172.17.100.37",
@@ -77,7 +83,9 @@ $(function () {
     
     // 页面加载完成后自动登录
     setTimeout(function() {
-        clickLogin();
+        if (!g_bIsLoggedIn) {
+            clickLogin();
+        }
     }, 1000); // 延迟1秒确保插件初始化完成
 });
 
@@ -210,6 +218,11 @@ function changeWndNum(iType) {
 
 // 登录
 function clickLogin() {
+    // 如果已经登录，直接返回
+    if (g_bIsLoggedIn) {
+        return;
+    }
+
     // 使用登录配置
     var szIP = '172.17.100.37',
         szPort = "80",
@@ -225,21 +238,42 @@ function clickLogin() {
     var iRet = WebVideoCtrl.I_Login(szIP, 1, szPort, szUsername, szPassword, {
         success: function (xmlDoc) {            
             // 登录成功
+            g_bIsLoggedIn = true;
+            g_szCurrentDevice = szDeviceIdentify;
+            g_iLoginRetryCount = 0;
+            
+            // 更新页面上的设备选择框
+            
             setTimeout(function () {
                 getChannelInfo();
                 getDevicePort();
             }, 10);
         },
         error: function (status, xmlDoc) {
-            // 登录失败，重试
-            setTimeout(function() {
-                clickLogin();
-            }, 3000);
+            // 登录失败，检查重试次数
+            g_iLoginRetryCount++;
+            
+            if (g_iLoginRetryCount < g_iMaxLoginRetries && !g_bIsLoggedIn) {
+                // 继续重试，3秒后再次尝试
+                setTimeout(function() {
+                    if (!g_bIsLoggedIn) {
+                        clickLogin();
+                    }
+                }, 3000);
+            } else {
+                // 达到最大重试次数，停止重试
+                g_iLoginRetryCount = 0;
+            }
         }
     });
 
     if (-1 == iRet) {
         // 设备已登录
+        g_bIsLoggedIn = true;
+        g_szCurrentDevice = szDeviceIdentify;
+        g_iLoginRetryCount = 0;
+        
+        // 更新页面上的设备选择框
         setTimeout(function () {
             getChannelInfo();
             getDevicePort();
@@ -259,6 +293,11 @@ function clickLogout() {
     var iRet = WebVideoCtrl.I_Logout(szDeviceIdentify);
     if (0 == iRet) {
         szInfo = "退出成功！";
+        
+        // 重置登录状态
+        g_bIsLoggedIn = false;
+        g_szCurrentDevice = "";
+        g_iLoginRetryCount = 0;
 
         $("#ip option[value='" + szDeviceIdentify + "']").remove();
         getChannelInfo();
@@ -299,10 +338,10 @@ function clickGetDeviceInfo() {
 
 // 获取通道
 function getChannelInfo() {
-    var szDeviceIdentify = $("#ip").val(),
+    var szDeviceIdentify = g_szCurrentDevice || $("#ip").val(),
         oSel = $("#channels").empty();
 
-    if (null == szDeviceIdentify) {
+    if (null == szDeviceIdentify || "" == szDeviceIdentify) {
         return;
     }
 
@@ -376,9 +415,9 @@ function getChannelInfo() {
 
 // 获取端口
 function getDevicePort() {
-    var szDeviceIdentify = $("#ip").val();
+    var szDeviceIdentify = g_szCurrentDevice || $("#ip").val();
 
-    if (null == szDeviceIdentify) {
+    if (null == szDeviceIdentify || "" == szDeviceIdentify) {
         return;
     }
 
